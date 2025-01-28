@@ -67,7 +67,7 @@ String received = ""; //recieved user input in bluetooth
 
 
 // default user control variables
-String defaultMessage = "CPD Center Welcomes You"; //default message to change in flash memory
+String defaultMessage = "Hello and Welcome!"; //default message to change in flash memory
 int defaultBrightness = 122; //0-255 128=50% approx. (will be restricted to 150 in app)
 int defaultTextSize = 3; //5 should be maximum (more than 60% screen height)
 int duration = 20; //this controls the speed of the scrolling text (smaller = faster)
@@ -85,7 +85,8 @@ int emojiWidthOne = 32;
 int emojiWidthTwo = 32;
 const GFXfont *currentFont = nullptr;
 String requestedFont = "Default";
-
+bool newInput = false;
+bool drawLineMode = false;
 uint16_t time_counter = 0, cycles = 0, fps = 0; // for plasma effect
 unsigned long fps_timer; // ***
 
@@ -190,16 +191,25 @@ class MyCallbacks : public BLECharacteristicCallbacks {
         newSize = 1; 
       }
       defaultTextSize = newSize;
+      matrix->clearScreen();
     } else if (received.startsWith("plasma:on")) {
+      matrix->clearScreen();
       plasmaMode = true;
       displayOn = false;
+      matrix->clearScreen();
     } else if (received.startsWith("plasma:off")) {
+      matrix->clearScreen();
       plasmaMode = false;
       displayOn = true;
+      matrix->clearScreen();
     } else if (received.startsWith("wrap:on")) {
+        matrix->clearScreen();
         textWrapStatic = true;
+        matrix->clearScreen();
     } else if (received.startsWith("wrap:off")) {
+        matrix->clearScreen();
         textWrapStatic = false;
+        matrix->clearScreen();
     } else if (received.startsWith("emoji1:")) {
       showOneEmoji = true;
       requestedEmojiOne = received.substring(7);
@@ -242,18 +252,36 @@ class MyCallbacks : public BLECharacteristicCallbacks {
     } else if (received == "multicolor:off") {
       multiColor = false;
     } else if (received == "off") {
+      matrix->clearScreen();
       displayOn = false;
       plasmaMode = false;
       matrix->clearScreen();
-      matrix->flipDMABuffer();
+      //matrix->flipDMABuffer();
     } else if (received == "on") {
+      matrix->clearScreen();
       displayOn = true;
+      matrix->clearScreen();
+    } else if (received == "clear") {
+      matrix->clearScreen();
+    } else if (received == "drawline:on") {
+      matrix->clearScreen();
+      drawLineMode = true;
+      matrix->clearScreen();
+    } else if (received == "drawline:off") {
+      matrix->clearScreen();
+      drawLineMode = false;
+      matrix->clearScreen();
     } else if (received == "reset") {
       ESP.restart();
     } else {
+      matrix->clearScreen();
       msg = String(rxValue.c_str()); 
+      matrix->clearScreen();
     }
+    matrix->clearScreen();
     sendDisplayStatus();
+    newInput = true;
+    matrix->clearScreen();
   }
 };
 
@@ -321,9 +349,9 @@ void setup() {
   //mxconfig.gpio.e = 22; //another way to configure pin E
   //mxconfig.driver = HUB75_I2S_CFG::FM6126A; //for different driver check your schematic
   //mxconfig.latch_blanking = 4; //for ghosting problems increase time between clocking in data and turning leds on
-  mxconfig.i2sspeed = HUB75_I2S_CFG::HZ_20M; //I2S clock speed, only for experimentation
+  //mxconfig.i2sspeed = HUB75_I2S_CFG::HZ_20M; //I2S clock speed, only for experimentation
   //mxconfig.driver = HUB75_I2S_CFG::SHIFT;   // shift reg driver, default is plain shift register
-  mxconfig.double_buff = true; // double ram usage & smoother graphics and less flicker
+  //mxconfig.double_buff = false; // double ram usage & smoother graphics and less flicker
 
   // mxconfig.driver = HUB75_I2S_CFG::ICN2038S;
 	// mxconfig.driver = HUB75_I2S_CFG::FM6124;
@@ -335,7 +363,7 @@ void setup() {
   // Allocate memory and start DMA display
   if( not matrix->begin() ) {
     Serial.println("__memory allocation failed__");
-    //ESP.restart();
+    ESP.restart();
   }
   
   //pass default values to the screen matrix object
@@ -354,17 +382,23 @@ void setup() {
 
 //start main loop function
 void loop() {
+
+  if (displayOn) {
+    displayMessage(msg, defaultTextSize, defaultColor, wheelval, currentEmojiOne, currentEmojiTwo, emojiWidthOne, emojiWidthTwo); 
+  }
+  //Serial.print(ESP.getFreeHeap()); //for memory constraints with dma buffer
   //notify changed value
   if (deviceConnected) {
     sendDisplayStatus();
-    delay(3);  // bluetooth stack will go into congestion, if too many packets are sent.
+    delay(3);  // bluetooth stack will go into congestion, if too many packets are sent. (in a 6 hours test you can go as low as 3ms)
   }
 
   //disconnecting
   if (!deviceConnected && oldDeviceConnected) {
     delay(500);                   // give the bluetooth stack the chance to get things ready
     pServer->startAdvertising();  // restart advertising
-    Serial.println("start advertising");
+    //Serial.println("start advertising");
+    multiColor = false; //multicolor flashes when disconnected for some reason :(
     oldDeviceConnected = deviceConnected;
   }
   // connecting
@@ -372,9 +406,9 @@ void loop() {
     // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
   }
-  matrix->flipDMABuffer(); // Show the back buffer, set currently output buffer to the back (i.e. no longer being sent to LED panels)
-  matrix->clearScreen();   // Now clear the back-buffer
-  delay(duration); //shouldn't see this clearscreen occur as it happens on the back buffer when double buffering is enabled.
+  //matrix->flipDMABuffer(); // Show the back buffer, set currently output buffer to the back (i.e. no longer being sent to LED panels)
+  //matrix->clearScreen();   // Now clear the back-buffer
+  //delay(duration); //shouldn't see this clearscreen occur as it happens on the back buffer when double buffering is enabled.
 
   //for testing before adding bluetooth code (in essence all these boolean values can be controlled via web app and toggle switches)
   // if (Serial.available() > 0) {
@@ -384,7 +418,6 @@ void loop() {
   // }
 
   if (plasmaMode) {
-    matrix->clearScreen();
     plasmaDemo();
   }
 
@@ -427,16 +460,10 @@ void loop() {
         currentEmojiOne = x;
       } else if (requestedEmojiOne=="heart_eyes") {
         currentEmojiOne = heart_eyes;
-      } else if (requestedEmojiOne=="flag_sa") {
-        currentEmojiOne = flag_sa;
       } else if (requestedEmojiOne=="wave") {
         currentEmojiOne = wave;
       } else if (requestedEmojiOne=="pencil") {
         currentEmojiOne = pencil;
-      } else if (requestedEmojiOne=="upm2_logo") {
-        currentEmojiOne = upm2_logo;
-      } else if (requestedEmojiOne=="cpd_center_logo") {
-        currentEmojiOne = cpd_center_logo;
       } else {
         currentEmojiOne = nullptr;
         requestedEmojiOne = "";
@@ -482,24 +509,15 @@ void loop() {
       currentEmojiTwo = x;
     } else if (requestedEmojiTwo=="heart_eyes") {
       currentEmojiTwo = heart_eyes;
-    } else if (requestedEmojiTwo=="flag_sa") {
-      currentEmojiTwo = flag_sa;
     } else if (requestedEmojiTwo=="wave") {
       currentEmojiTwo = wave;
     } else if (requestedEmojiTwo=="pencil") {
       currentEmojiTwo = pencil;
-    } else if (requestedEmojiTwo=="cpd_center_logo") {
-      currentEmojiTwo = cpd_center_logo;
-    } else if (requestedEmojiTwo=="upm2_logo") {
       currentEmojiTwo = upm2_logo;
     } else {
       currentEmojiTwo = nullptr;
       requestedEmojiTwo = "";
     }
-  }
-
-  if (displayOn) {
-    displayMessage(msg, defaultTextSize, defaultColor, wheelval, currentEmojiOne, currentEmojiTwo, emojiWidthOne, emojiWidthTwo); 
   }
 
   //incrementing these for chnage in color pallete and multicolor mode
@@ -520,8 +538,7 @@ void loop() {
     fps_timer = millis();
     fps = 0;
   }
-
-  //delay(4);
+  // delay(duration); // to control the speed of plasma and colorful text rendering not just the text
 } 
 //end of loop
 
@@ -530,9 +547,13 @@ void loop() {
 // Function to display and scroll text with various options and emojis
 void displayMessage(String text, int mysize, uint16_t color, int colorOffSet, const uint16_t *myEmoji1, const uint16_t *myEmoji2, int imgWidth1, int imgWidth2) {
 
+  if (newInput) {
+    newInput = false;
+    matrix->clearScreen();
+    return;
+  }
   int16_t x1, y1;
   uint16_t w, h; 
-
   if (mysize < 1) { mysize = 1;}
   matrix->setTextWrap(false); //in scrolling don't wrap 
   matrix->setFont(currentFont); // Apply the current selected font   
@@ -577,11 +598,16 @@ void displayMessage(String text, int mysize, uint16_t color, int colorOffSet, co
     if (-endXPos> matrix->width()) { // Only scroll if message width is larger than screen width (-ve cuz endXPos is -ve)
       // once x is less than endX, for loop ends and when main loop starts over, the for loop starts over and decrements x position
       for (int x = startingXPos; x > endXPos; x--) {
-        matrix->clearScreen();
+        //matrix->clearScreen();
         int imgX1 = x + w + 2; // to position right of the scrolling text
         int imgX2 = imgX1 + imgWidth1 + 2; // to position right of the emoji1
         int textX = x;
-
+        if (newInput) {
+          newInput = false;
+          matrix->clearScreen();
+          return; 
+        }
+        matrix->fillScreen(0);
         if (showOneEmoji && myEmoji1 != nullptr) {
           displayEmoji(myEmoji1, imgX1, imgY1, imgWidth1, imgWidth1);
         } 
@@ -597,14 +623,25 @@ void displayMessage(String text, int mysize, uint16_t color, int colorOffSet, co
         }
         //matrix->flipDMABuffer(); // Show the back buffer, set currently output buffer to the back (i.e. no longer being sent to LED panels)
         //display->clearScreen();   // Now clear the back-buffer
-        //delay(duration); //shouldn't see this clearscreen occur as it happens on the back buffer when double buffering is enabled.
+        delay(duration); //shouldn't see this clearscreen occur as it happens on the back buffer when double buffering is enabled.
+        //matrix->clearScreen();
       }
 
     } else { // No scrolling, just display the text if it's smaller than screen width
-      matrix->clearScreen(); 
       int textX = (matrix->width() + endXPos) / 2;
       int imgX1 = textX + w + 2;
       int imgX2 = 2 + imgX1 + imgWidth1;
+
+      if (newInput) {
+        newInput = false;
+        matrix->clearScreen();
+        return;
+      }
+
+      if (drawLineMode) {
+        matrix->drawLine(0, 2, 127, 2, color);
+        matrix->drawLine(0, 61, 127, 61, color);
+      }
 
       if (showOneEmoji && myEmoji1 != nullptr) {
         displayEmoji(myEmoji1, imgX1, imgY1, imgWidth1, imgWidth1);
@@ -623,9 +660,14 @@ void displayMessage(String text, int mysize, uint16_t color, int colorOffSet, co
     }
 
   } else { // if text wrapping mode
-    matrix->clearScreen(); 
     matrix->setTextWrap(true);
     matrix->setFont(nullptr);
+    matrix->setTextSize(mysize);
+    if (newInput) {
+      newInput = false;
+      matrix->clearScreen();
+      return;
+    }
     if (multiColor) { 
       drawTextColored(text, colorOffSet, 0, 0); 
     } else {
